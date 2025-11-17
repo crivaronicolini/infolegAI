@@ -1,0 +1,84 @@
+# --- Variables ---
+project_id := `grep 'project_id' terraform.tfvars | cut -d'=' -f2 | tr -d ' "'`
+region     := `grep 'region' terraform.tfvars | cut -d'=' -f2 | tr -d ' "' || echo "us-central1"`
+env_name   := "prod"
+
+# --- Main Targets ---
+
+# Show available commands (default action)
+default:
+    @just --list
+
+# Show this help message
+help: default
+
+# Initial setup - create GCS bucket for Terraform state
+setup:
+    @echo "Creating Terraform state bucket..."
+    gsutil mb -l {{region}} gs://{{project_id}}-ragboletin-terraform-state || true
+    gsutil versioning set on gs://{{project_id}}-ragboletin-terraform-state
+    @echo "✓ State bucket ready"
+
+# Initialize Terraform in the 'terraform' directory
+init:
+    @echo "Initializing Terraform..."
+    cd terraform && terraform init
+    @echo "✓ Terraform initialized"
+
+# Validate Terraform configuration
+validate: init
+    @echo "Validating configuration..."
+    cd terraform && terraform validate
+    @echo "✓ Configuration valid"
+
+# Show what infrastructure changes Terraform will make
+plan: init
+    @echo "Planning infrastructure changes..."
+    cd terraform && terraform plan
+
+# Apply the infrastructure changes
+apply: init
+    @echo "Applying infrastructure changes..."
+    cd terraform && terraform apply
+
+# Destroy all managed infrastructure
+destroy: init
+    @echo "⚠️  DESTROYING infrastructure..."
+    cd terraform && terraform destroy
+
+# --- Utility Targets ---
+
+# Clean up local Terraform files
+clean:
+    @echo "Cleaning up local files..."
+    rm -rf terraform/.terraform*
+    rm -f terraform/terraform.tfstate*
+    @echo "✓ Local cleanup complete"
+
+# --- Cloud Run Deployment ---
+
+# Build and push Docker image using Cloud Build
+build-image:
+     @echo "Building and pushing Dagster webserver image..."
+     gcloud builds submit --config cloudbuild.yaml --substitutions _REGION={{region}}
+     @echo "✅ Image built and pushed"
+
+# Deploy Cloud Run service manually (alternative to Terraform)
+deploy-cloudrun:
+     @echo "Deploying Dagster to Cloud Run..."
+     gcloud run deploy dagster-webserver-{{env_name}} \
+       --image gcr.io/{{project_id}}/dagster-webserver:latest \
+       --region {{region}} \
+       --platform managed \
+       --service-account composer-airflow-sa@{{project_id}}.iam.gserviceaccount.com \
+       --allow-unauthenticated \
+       --set-env-vars DAGSTER_DEPLOYMENT={{env_name}},GCP_PROJECT_ID={{project_id}} \
+       --vpc-connector dagster-connector-{{env_name}} \
+       --add-cloudsql-instances {{project_id}}:{{region}}:dagster-db-{{env_name}}
+     @echo "✅ Cloud Run service deployed"
+
+# Full deployment: build image and apply Terraform infrastructure
+deploy: build-image
+     @echo "Applying Terraform changes..."
+     cd terraform && terraform apply
+     @echo "✅ Deployment complete"

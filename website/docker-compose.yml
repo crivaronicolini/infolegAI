@@ -1,0 +1,42 @@
+services:
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "8080:8080"
+    env_file:
+      - .env
+    environment:
+      - GOOGLE_APPLICATION_CREDENTIALS=/var/run/secrets/google/adc.json
+    volumes:
+      - ./data:/data
+      - ${HOME}/.config/gcloud/application_default_credentials.json:/var/run/secrets/google/adc.json:ro
+    restart: unless-stopped
+    develop:
+      watch:
+        # Sync Python source files - uvicorn --reload will pick up changes
+        - action: sync
+          path: ./src
+          target: /app/src
+          ignore:
+            - __pycache__/
+            - "*.pyc"
+        
+        # Sync template files
+        - action: sync
+          path: ./templates
+          target: /app/templates
+        
+        # Sync static files
+        - action: sync
+          path: ./static
+          target: /app/static
+        
+        # Rebuild on dependency changes
+        - action: rebuild
+          path: ./pyproject.toml
+        
+        - action: rebuild
+          path: ./uv.lock
+
