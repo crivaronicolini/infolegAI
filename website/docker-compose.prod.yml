@@ -1,0 +1,27 @@
+services:
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "8080:8080"
+    env_file:
+      - .env
+    environment:
+      # Production settings
+      - ENVIRONMENT=production
+      - FRONTEND_URL=http://localhost:8080
+      - DATABASE_URL=sqlite+aiosqlite:////data/infoleg.db
+      - VECTOR_DB_PATH=/data/vector
+      - DOC_DIR_PATH=/data/docs
+      - GOOGLE_APPLICATION_CREDENTIALS=/var/run/secrets/google/adc.json
+    volumes:
+      - ./mnt:/data
+      - ${HOME}/.config/gcloud/application_default_credentials.json:/var/run/secrets/google/adc.json:ro
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8080/api/v1/openapi.json')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s

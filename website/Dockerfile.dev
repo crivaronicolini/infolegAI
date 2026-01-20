@@ -1,0 +1,22 @@
+FROM ghcr.io/astral-sh/uv:python3.13-bookworm-slim
+
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    UV_COMPILE_BYTECODE=1 \
+    UV_LINK_MODE=copy \
+    UV_TOOL_BIN_DIR=/usr/local/bin \
+    XDG_CACHE_HOME=/tmp/.cache \
+    UV_CACHE_DIR=/tmp/.cache/uv
+
+WORKDIR /app
+
+# Install dependencies
+RUN --mount=type=cache,target=/root/.cache/uv \
+    --mount=type=bind,source=uv.lock,target=/app/uv.lock \
+    --mount=type=bind,source=pyproject.toml,target=/app/pyproject.toml \
+    uv sync --locked --no-install-project --no-dev
+
+# Prepare directories
+RUN mkdir -p /data /tmp/.cache/uv 
+
+EXPOSE 8000

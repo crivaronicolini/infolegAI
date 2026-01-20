@@ -1,0 +1,133 @@
+# InfolegAI Development Commands
+
+# List available commands
+default:
+    @just --list
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Development Servers
+# ─────────────────────────────────────────────────────────────────────────────
+
+# Run backend development server
+backend:
+    uv run fastapi dev app/main.py
+
+# Run frontend development server
+frontend:
+    cd frontend && npm run dev
+
+# Run both frontend and backend (requires terminal multiplexer or two terminals)
+dev:
+    @echo "Run 'just backend' and 'just frontend' in separate terminals"
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Docker
+# ─────────────────────────────────────────────────────────────────────────────
+
+# Start development environment with Docker (hot reload enabled)
+docker-dev:
+    docker-compose -f docker-compose.dev.yml up
+
+# Start development environment in background
+docker-dev-bg:
+    docker-compose -f docker-compose.dev.yml up -d
+
+# Stop development environment
+docker-dev-down:
+    docker-compose -f docker-compose.dev.yml down
+
+# Start production environment with Docker
+docker-prod:
+    docker-compose -f docker-compose.prod.yml up --build
+
+# Start production environment in background
+docker-prod-bg:
+    docker-compose -f docker-compose.prod.yml up --build -d
+
+# Stop production environment
+docker-prod-down:
+    docker-compose -f docker-compose.prod.yml down
+
+# View logs for development environment
+docker-dev-logs:
+    docker-compose -f docker-compose.dev.yml logs -f
+
+# View logs for production environment
+docker-prod-logs:
+    docker-compose -f docker-compose.prod.yml logs -f
+
+# Rebuild development images
+docker-dev-rebuild:
+    docker-compose -f docker-compose.dev.yml build
+
+# Rebuild production images
+docker-prod-rebuild:
+    docker-compose -f docker-compose.prod.yml build
+
+# Clean up Docker resources (containers, volumes, images)
+docker-clean:
+    docker-compose -f docker-compose.dev.yml down -v
+    docker-compose -f docker-compose.prod.yml down -v
+    docker system prune -f
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Backend (Python)
+# ─────────────────────────────────────────────────────────────────────────────
+
+# Format Python code with ruff
+format:
+    uv run ruff format .
+
+# Check Python code with ruff
+lint:
+    uv run ruff check .
+
+# Fix Python linting issues automatically
+lint-fix:
+    uv run ruff check . --fix
+
+# Run Python type checking with ty
+typecheck:
+    uv run ty check
+
+# Check Python formatting (dry run)
+format-check:
+    uv run ruff format . --check
+
+# Run all Python checks (format check, lint, typecheck)
+check: format-check lint typecheck
+
+# Run Python tests
+test *args:
+    uv run pytest {{args}}
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Frontend (TypeScript/React)
+# ─────────────────────────────────────────────────────────────────────────────
+
+# Lint frontend code
+frontend-lint:
+    cd frontend && npm run lint
+
+# Build frontend for production
+frontend-build:
+    cd frontend && npm run build
+
+# Type check frontend
+frontend-typecheck:
+    cd frontend && npx tsc --noEmit
+
+# ─────────────────────────────────────────────────────────────────────────────
+# All
+# ─────────────────────────────────────────────────────────────────────────────
+
+# Run all checks (backend + frontend)
+check-all: check frontend-lint frontend-typecheck
+
+# Format and fix all code
+fix: format lint-fix
+
+# Install all dependencies
+install:
+    uv sync
+    cd frontend && npm install

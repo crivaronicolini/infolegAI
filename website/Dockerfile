@@ -1,4 +1,22 @@
-FROM ghcr.io/astral-sh/uv:python3.12-bookworm-slim
+# Stage 1: Build frontend
+FROM node:22-bookworm-slim AS frontend-builder
+
+WORKDIR /frontend
+
+# Copy frontend package files
+COPY frontend/package.json frontend/package-lock.json* ./
+
+# Install dependencies
+RUN npm ci
+
+# Copy frontend source
+COPY frontend/ ./
+
+# Build the frontend
+RUN npm run build
+
+# Stage 2: Python backend
+FROM ghcr.io/astral-sh/uv:python3.13-bookworm-slim
 
 # Environment configuration
 ENV PYTHONUNBUFFERED=1 \
@@ -17,19 +35,16 @@ RUN --mount=type=cache,target=/root/.cache/uv \
     --mount=type=bind,source=pyproject.toml,target=/app/pyproject.toml \
     uv sync --locked --no-install-project --no-dev
 
-# Prepare data directory for SQLite and set permissions for non-root user
-RUN mkdir -p /data && chown -R 1000:1000 /data /app
-RUN mkdir -p /tmp/.cache/uv && chown -R 1000:1000 /tmp/.cache
+# Prepare data directory for SQLite
+RUN mkdir -p /data /tmp/.cache/uv
 
 # Copy application code
-COPY src ./src
-COPY templates ./templates
-COPY static ./static
+COPY app ./app
 
-# Drop privileges
-USER 1000:1000
+# Copy built frontend from previous stage
+COPY --from=frontend-builder /frontend/dist ./static
 
 EXPOSE 8080
 
-# Start the FastAPI server with reload for development
-CMD ["uv", "run", "uvicorn", "src.main:app", "--host", "0.0.0.0", "--port", "8080", "--reload"]
+# Start the FastAPI server in production mode
+CMD ["uv", "run", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8080"]
